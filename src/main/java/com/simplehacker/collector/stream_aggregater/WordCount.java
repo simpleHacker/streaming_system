@@ -1,5 +1,9 @@
 package com.simplehacker.collector.stream_aggregater;
 
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.Properties;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with
@@ -18,19 +22,16 @@ package com.simplehacker.collector.stream_aggregater;
  */
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.kstream.KStreamBuilder;
 import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.KStreamBuilder;
 import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.kstream.KeyValueMapper;
 import org.apache.kafka.streams.kstream.ValueMapper;
-
-import java.util.Arrays;
-import java.util.Locale;
-import java.util.Properties;
 
 /**
  * Demonstrates, using the high-level KStream DSL, how to implement the WordCount program
@@ -45,39 +46,31 @@ import java.util.Properties;
  * bin/kafka-console-producer.sh). Otherwise you won't see any data arriving in the output topic.
  */
 public class WordCount {
-
+	
     public static void main(String[] args) throws Exception {
-        Properties props = new Properties();
-        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "streams-wordcount");
-        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-        props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
-        props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
-        props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
-
-        // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
-        // Note: To re-run the demo, you need to use the offset reset tool:
-        // https://cwiki.apache.org/confluence/display/KAFKA/Kafka+Streams+Application+Reset+Tool
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-
+        
+    	WordCount wc = new WordCount();
+    	
+    	Properties props = new Properties();
         KStreamBuilder builder = new KStreamBuilder();
+        
+        // configure with properties
+        wc.configure(props);
 
-        KStream<String, String> source = builder.stream("streams-file-input");
+        final Serde<String> stringSerde = Serdes.String();
+        final Serde<Long> longSerde = Serdes.Long();
+        KStream<String, String> source = builder.stream(stringSerde, stringSerde, "streams-file-input");
 
         KTable<String, Long> counts = source
-                .flatMapValues(new ValueMapper<String, Iterable<String>>() {
-                    public Iterable<String> apply(String value) {
-                        return Arrays.asList(value.toLowerCase(Locale.getDefault()).split(" "));
-                    }
-                }).map(new KeyValueMapper<String, String, KeyValue<String, String>>() {
-                    public KeyValue<String, String> apply(String key, String value) {
-                        return new KeyValue<String, String>(value, value);
-                    }
-                })
-                .groupByKey()
+        		// split each text line, by whitespace, into words
+                .flatMapValues(value -> Arrays.asList(value.toLowerCase().split("\\W+")))
+                // group the text words as message keys
+                .groupBy((key, value) -> value)
+                // count the occurrences of each word
                 .count("Counts");
 
-        // need to override value serde to Long type
-        counts.to(Serdes.String(), Serdes.Long(), "streams-wordcount-output");
+        // store the running counts as a changelong stream to the output topic
+        counts.to(stringSerde, longSerde, "streams-wordcount-output");
 
         KafkaStreams streams = new KafkaStreams(builder, props);
         streams.start();
@@ -87,5 +80,18 @@ public class WordCount {
         Thread.sleep(5000L);
 
         streams.close();
+    }
+    
+    private void configure(Properties props) {
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "streams-wordcount");
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "10.0.100.11:9092,10.0.100.12:9092");
+        props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
+        props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
+        props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
+
+        // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
+        // Note: To re-run the demo, you need to use the offset reset tool:
+        // https://cwiki.apache.org/confluence/display/KAFKA/Kafka+Streams+Application+Reset+Tool
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");	
     }
 }
