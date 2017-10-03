@@ -44,6 +44,19 @@ import org.apache.kafka.streams.kstream.ValueMapper;
  * Before running this example you must create the input topic and the output topic (e.g. via
  * bin/kafka-topics.sh --create ...), and write some data to the input topic (e.g. via
  * bin/kafka-console-producer.sh). Otherwise you won't see any data arriving in the output topic.
+ *
+ * Consumer program running after this program ran done!!!:
+ * check topic content.
+ * bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 \
+    --topic streams-wordcount-output \
+    --from-beginning \
+    --formatter kafka.tools.DefaultMessageFormatter \
+    --property print.key=true \
+    --property print.value=true \
+    --property key.deserializer=org.apache.kafka.common.serialization.StringDeserializer \
+    --property value.deserializer=org.apache.kafka.common.serialization.LongDeserializer
+
+ *
  */
 public class WordCount {
 	
@@ -84,7 +97,7 @@ public class WordCount {
     
     private void configure(Properties props) {
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, "streams-wordcount");
-        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "10.0.100.11:9092,10.0.100.12:9092");
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "10.0.100.11:9092,10.0.100.12:9092,10.0.100.13:9092,10.0.100.14:9092");
         props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
